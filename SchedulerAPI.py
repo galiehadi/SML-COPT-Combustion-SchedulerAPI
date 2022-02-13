@@ -1,60 +1,62 @@
-import asyncio, time, requests
-import aioschedule as schedule
+import time, requests, db_config, inspect, threading
+from urllib.parse import quote_plus as urlparse
 
-_IP_ = '192.168.2.11:8083'
-_MLIP_ = '192.168.2.11:5002'
+_UNIT_CODE_ = db_config._UNIT_CODE_
+_UNIT_NAME_ = db_config._UNIT_NAME_
+_USER_ = db_config._USER_
+_PASS_ = urlparse(db_config._PASS_)
+_IP_ = db_config._IP_
+_DB_NAME_ = db_config._DB_NAME_
+_LOCAL_IP_ = db_config._LOCAL_IP_
 
-RECOM_EXEC_INTERVAL = 5
+Timer = {
+    'safeguard_check': {
+        'last_running': 0,
+        'scheduler': 1
+    },
+    'ml_run': {
+        'last_running': 0,
+        'scheduler': 3
+    },
+}
 
-def strftime():
-    f = str(round(time.time() % 1,5)).replace('0.','')
-    return time.strftime(f'[%Y-%m-%d %H:%M:%S.{f}]')
+def now():
+    ms = str(time.time() % 1)[2:5]
+    return time.strftime(f'%Y-%m-%d %X.{ms}\t')
 
-def prints(*args):
-    print(strftime(), end=' ')
-    print(args)
+def safeguard_check():
+    func_name = inspect.currentframe().f_code.co_name
+    if (time.time() - Timer[func_name]['last_running']) > Timer[func_name]['scheduler']:
+        Timer[func_name]['last_running'] = time.time()
 
-def init_get_recom_exec_interval():
-    try:
-        data = requests.get(f'http://{_IP_}/service/copt/bat/combustion/background/get_recom_exec_interval').json()
-        interval = data['object']
-    except Exception as e:
-        prints('Initial get recom exec interval error:', e)
-    return interval
+        # Run code here
+        # print(now(), f'running {func_name}')
+        requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/safeguardcheck')
+        
 
-async def get_recom_exec_interval():
-    global RECOM_EXEC_INTERVAL
-    try:
-        data = requests.get(f'http://{_IP_}/service/copt/bat/combustion/background/get_recom_exec_interval').json()
-        interval = data['object']
-        RECOM_EXEC_INTERVAL = interval
-    except Exception as e:
-        prints('Get recom exec interval error:', e)
-    return interval
+def ml_run():
+    func_name = inspect.currentframe().f_code.co_name
+    if (time.time() - Timer[func_name]['last_running']) > Timer[func_name]['scheduler']:
+        Timer[func_name]['last_running'] = time.time()
 
-async def safeguard_check():
-    try:
-        data = requests.get(f'http://{_IP_}/service/copt/bat/combustion/background/safeguardcheck')
-        await asyncio.sleep(1)
-    except Exception as e:
-        prints('Safeguard check error:', e)
+        # Run code here
+        print(now(), f'running {func_name}')
+        ## update ml_run timer
+        requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/runner')
+        data = requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/get_recom_exec_interval')
 
-async def machine_learning_predict():
-    try:
-        data = requests.get(f'http://{_IP_}/service/copt/bat/combustion/background/update_machine_learning_recommendation')
-    except Exception as e:
-        prints('Machine learning prediction error:', e)
+        try: 
+            Timer[func_name]['scheduler'] = 60 * (float(data.json()['object']))
+            print(f"Updated timer to {Timer[func_name]['scheduler']} sec.")
+        except Exception as e: print(e)
+
+def main():
+    t1 = threading.Thread(target=safeguard_check)
+    t2 = threading.Thread(target=ml_run)
+    t1.start()
+    t2.start()
     
 
-try: RECOM_EXEC_INTERVAL = init_get_recom_exec_interval()
-except: pass
-
-schedule.every().seconds.do(safeguard_check)
-schedule.every(RECOM_EXEC_INTERVAL).minutes.do(machine_learning_predict)
-
-
-loop = asyncio.get_event_loop()
 while True:
-   loop.run_until_complete(schedule.run_pending())
-   time.sleep(0.1)
-
+    main()
+    time.sleep(1)
