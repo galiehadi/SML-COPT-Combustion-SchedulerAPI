@@ -12,11 +12,11 @@ _LOCAL_IP_ = db_config._LOCAL_IP_
 Timer = {
     'safeguard_check': {
         'last_running': 0,
-        'scheduler': 1
+        'scheduler': 2
     },
     'ml_run': {
         'last_running': 0,
-        'scheduler': 3
+        'scheduler': 10
     },
 }
 
@@ -43,12 +43,12 @@ def ml_run():
         print(now(), f'running {func_name}')
         ## update ml_run timer
         requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/runner')
-        data = requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/get_recom_exec_interval')
+        # data = requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/get_recom_exec_interval')
 
-        try: 
-            Timer[func_name]['scheduler'] = 60 * (float(data.json()['object']))
-            print(f"Updated timer to {Timer[func_name]['scheduler']} sec.")
-        except Exception as e: print(e)
+        # try: 
+        #     Timer[func_name]['scheduler'] = 60 * (float(data.json()['object']))
+        #     print(f"Updated timer to {Timer[func_name]['scheduler']} sec.")
+        # except Exception as e: print(e)
 
 def main():
     t1 = threading.Thread(target=safeguard_check)
