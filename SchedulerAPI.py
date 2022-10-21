@@ -31,7 +31,11 @@ def safeguard_check():
 
         # Run code here
         # print(now(), f'running {func_name}')
-        requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/safeguardcheck')
+        safeguard_url = f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/safeguardcheck'
+        try:
+            requests.get(safeguard_url)
+        except Exception as E:
+            print(now(), f'Failed to call "{safeguard_url}"')
         
 
 def ml_run():
@@ -42,13 +46,14 @@ def ml_run():
         # Run code here
         print(now(), f'running {func_name}')
         ## update ml_run timer
-        requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/runner')
-        data = requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/get_recom_exec_interval')
 
         try: 
+            requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/runner')
+            data = requests.get(f'http://{_LOCAL_IP_}:8083/service/copt/bat/combustion/background/get_recom_exec_interval')
             Timer[func_name]['scheduler'] = 60 * (float(data.json()['object']))
-            print(f"Updated timer to {Timer[func_name]['scheduler']} sec.")
-        except Exception as e: print(e)
+            print(now(), f"Updated timer to {Timer[func_name]['scheduler']} sec.")
+        except Exception as e:
+            print(now(), f'Error calling "{e}"')
 
 def main():
     t1 = threading.Thread(target=safeguard_check)
