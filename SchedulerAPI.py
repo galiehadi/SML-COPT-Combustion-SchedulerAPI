@@ -16,7 +16,7 @@ Timer = {
     },
     'ml_run': {
         'last_running': 0,
-        'scheduler': 10
+        'scheduler': 20
     },
 }
 
